@@ -1,0 +1,11 @@
+The only way to own units of a token is to own a token account that holds some token balance of the token referenced by the account's (user space) mint property. 
+
+Hence, the escrow program will need an account to hold Alice's X tokens. 
+
+One way of achieving this is to have Alice create a temporary X token account to which she transfers the X tokens she wants to trade (The token program sets no limit on how many token accounts for the same mint one may be the authority of). 
+
+Then, using a function in the token program, she transfers the authority of the temporary X token account to the escrow program
+
+This transfer of ownership is done via PDA, which allows the program to own the X tokens, and thus temporarily become the authority of the token account, while the escrow is open.
+
+This is done by assigning the token account authority to a Program Derived Address (PDA) of the escrow program.

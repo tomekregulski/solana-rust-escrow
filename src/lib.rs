@@ -1,5 +1,6 @@
 pub mod entrypoint;
 pub mod instruction;
+pub mod processor;
 
 
 // Flow of the file structure:
