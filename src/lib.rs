@@ -21,3 +21,12 @@ pub mod error;
 
 // General workflow (can vary depending on the data sent to instruction):
 // Entrypoint -> Processor -> Instruction (API) -> Processor -> (State) -> Output / Error
+
+// Flow of first half of program:
+// 1. create empty account owned by token program
+// 2. initialize empty account as INITIALIZER's X token account
+// 3. transfer X tokens from INITIALIZER's main X token account to their temporary X token account
+// 4. create empty account owned by escrow program
+// 5. initialize empty account as escrow state and transfer temporary X token account ownership to PDA
+
+// Instructions may depend on previous instructions inside the same transaction. Transactions are atomic, so if any of the instructions fail, the entire transaction fails.
