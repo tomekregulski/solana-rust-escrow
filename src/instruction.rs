@@ -64,7 +64,7 @@ impl EscrowInstruction {
     }
 }
 
-// LOOK INTO FRONTRUNNING
+// LOOK INTO FRONTRUNNING ATTACKS
 
 /// Accepts a trade
 ///
