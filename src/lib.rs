@@ -1,18 +1,19 @@
-use solana_program::{
-    account_info::AccountInfo, entrypoint, entrypoint::ProgramResult, msg, pubkey::Pubkey,
-};
+pub mod entrypoint;
+pub mod instruction;
 
-entrypoint!(process_instruction);
-fn process_instruction(
-    program_id: &Pubkey,
-    accounts: &[AccountInfo],
-    instruction_data: &[u8],
-) -> ProgramResult {
-    msg!(
-        "process_instruction: {}: {} accounts, data={:?}",
-        program_id,
-        accounts.len(),
-        instruction_data
-    );
-    Ok(())
-}
+
+// Flow of the file structure:
+// 1. Someone calls the entrypoint
+// 2. The entrypoint forwards the arguments to the processor
+// 3. The processor asks instruction.rs to decode the   
+//      instruction_data argument from the entrypoint 
+//      function.
+// 4. Using the decoded data, the processor will now decide 
+//      which processing function to use to process the 
+//      request.
+// 5. The processor may use state.rs to encode state into or 
+//      decode the state of an account which has been passed 
+//      into the entrypoint.
+
+// General workflow (can vary depending on the data sent to instruction):
+// Entrypoint -> Processor -> Instruction (API) -> Processor -> (State) -> Output / Error
