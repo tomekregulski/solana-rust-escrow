@@ -24,6 +24,10 @@ impl Processor {
       EscrowInstruction::InitEscrow { amount } => {
         msg!("Instruction: InitEscrow");
         Self::process_init_escrow(accounts, amount, program_id)
+      },
+      EscrowInstruction::Exchange { amount } => {
+        msg!("Instruction: Exchange");
+        Self::process_exchange(accounts, amount, program_id)
       }
     }
   }
@@ -118,6 +122,138 @@ impl Processor {
                 token_program.clone(),
             ],
         )?;
+
+        Ok(())
+    }
+
+    // INITIALLY SIMILAR TO PROCESS INIT ESCROW
+    fn process_exchange(
+        accounts: &[AccountInfo],
+        amount_expected_by_taker: u64,
+        program_id: &Pubkey,
+    ) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+        let taker = next_account_info(account_info_iter)?;
+
+        if !taker.is_signer {
+            return Err(ProgramError::MissingRequiredSignature);
+        }
+
+        let takers_sending_token_account = next_account_info(account_info_iter)?;
+
+        let takers_token_to_receive_account = next_account_info(account_info_iter)?;
+
+        let pdas_temp_token_account = next_account_info(account_info_iter)?;
+        let pdas_temp_token_account_info =
+            TokenAccount::unpack(&pdas_temp_token_account.try_borrow_data()?)?;
+        let (pda, nonce) = Pubkey::find_program_address(&[b"escrow"], program_id);
+
+        if amount_expected_by_taker != pdas_temp_token_account_info.amount {
+            return Err(EscrowError::ExpectedAmountMismatch.into());
+        }
+
+        let initializers_main_account = next_account_info(account_info_iter)?;
+        let initializers_token_to_receive_account = next_account_info(account_info_iter)?;
+        let escrow_account = next_account_info(account_info_iter)?;
+
+        let escrow_info = Escrow::unpack(&escrow_account.try_borrow_data()?)?;
+
+        if escrow_info.temp_token_account_pubkey != *pdas_temp_token_account.key {
+            return Err(ProgramError::InvalidAccountData);
+        }
+
+        if escrow_info.initializer_pubkey != *initializers_main_account.key {
+            return Err(ProgramError::InvalidAccountData);
+        }
+
+        if escrow_info.initializer_token_to_receive_account_pubkey
+            != *initializers_token_to_receive_account.key
+        {
+            return Err(ProgramError::InvalidAccountData);
+        }
+
+        let token_program = next_account_info(account_info_iter)?;
+
+        let transfer_to_initializer_ix = spl_token::instruction::transfer(
+            token_program.key,
+            takers_sending_token_account.key,
+            initializers_token_to_receive_account.key,
+            taker.key,
+            &[&taker.key],
+            escrow_info.expected_amount,
+        )?;
+        msg!("Calling the token program to transfer tokens to the escrow's initializer...");
+        invoke(
+            &transfer_to_initializer_ix,
+            &[
+                takers_sending_token_account.clone(),
+                initializers_token_to_receive_account.clone(),
+                taker.clone(),
+                token_program.clone(),
+            ],
+        )?;
+
+        // SOMETHING NEW
+        // 
+        let pda_account = next_account_info(account_info_iter)?;
+
+        let transfer_to_taker_ix = spl_token::instruction::transfer(
+            token_program.key,
+            pdas_temp_token_account.key,
+            takers_token_to_receive_account.key,
+            &pda,
+            &[&pda],
+            pdas_temp_token_account_info.amount,
+        )?;
+        // INVOKE SIGNED - allows the PDA to sign
+        //
+        // By providing the seeds and program_id of the calling program, the runtime can recreate the PDA and match it against the accounts provided inside INVOKE_SIGNED's arguments. If there is a match, then the "signed" property of that account will be set to "true"
+        //
+        // Because only the Escrow program will have the programId that results in a matching PDA, this validation cannot be faked as long as the program is built properly. 
+        msg!("Calling the token program to transfer tokens to the taker...");
+        // the first invoke_signed call transfers the tokens from the temp X token account to RECEIVER's main X token account. 
+        invoke_signed(
+            &transfer_to_taker_ix,
+            &[
+                pdas_temp_token_account.clone(),
+                takers_token_to_receive_account.clone(),
+                pda_account.clone(),
+                token_program.clone(),
+            ],
+            &[&[&b"escrow"[..], &[nonce]]],
+        )?;
+
+        let close_pdas_temp_acc_ix = spl_token::instruction::close_account(
+            token_program.key,
+            pdas_temp_token_account.key,
+            initializers_main_account.key,
+            &pda,
+            &[&pda],
+        )?;
+        msg!("Calling the token program to close pda's temp account...");
+        // the first invoke_signed call closes the account - aka drain the balance, allowing it to be purged from memory by the runtime after the transaction
+        invoke_signed(
+            &close_pdas_temp_acc_ix,
+            &[
+                pdas_temp_token_account.clone(),
+                initializers_main_account.clone(),
+                pda_account.clone(),
+                token_program.clone(),
+            ],
+            &[&[&b"escrow"[..], &[nonce]]],
+        )?;
+
+        msg!("Closing the escrow account...");
+        // Must clear the data for security purposes, even if the intention is to have the account purged after the transaction.
+        //
+        // Specifically:
+        // In any call to a program that is of the "close" kind, i.e. where you set an account's lamports to zero so it's removed from memory after the transaction, make sure to either clear the data field or leave the data in a state that would be OK to be recovered by a subsequent transaction.
+        **initializers_main_account.try_borrow_mut_lamports()? = initializers_main_account
+            .lamports()
+            .checked_add(escrow_account.lamports())
+            .ok_or(EscrowError::AmountOverflow)?;
+        **escrow_account.try_borrow_mut_lamports()? = 0;
+        *escrow_account.try_borrow_mut_data()? = &mut [];
 
         Ok(())
     }

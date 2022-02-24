@@ -24,6 +24,6 @@ impl From<EscrowError> for ProgramError {
     }
 }
 
-/// Let's stop for a moment to understand what is happening here. We are implementing a generic trait, specifically the From (opens new window)trait which the ? operator wants to use. To implement this trait we have to implement the from function which carries out the conversion. The ProgramError enum provides the Custom variant that allows us to convert from our program's EscrowError to a ProgramError.
+// Let's stop for a moment to understand what is happening here. We are implementing a generic trait, specifically the From (opens new window)trait which the ? operator wants to use. To implement this trait we have to implement the from function which carries out the conversion. The ProgramError enum provides the Custom variant that allows us to convert from our program's EscrowError to a ProgramError.
 
-/// The reason we do this conversion in the first place is that the entrypoint returns a Result of either nothing or a ProgramError.
+// The reason we do this conversion in the first place is that the entrypoint returns a Result of either nothing or a ProgramError.
