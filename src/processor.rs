@@ -1,13 +1,12 @@
-
 use solana_program::{
     account_info::{next_account_info, AccountInfo},
     entrypoint::ProgramResult,
-    program_error::ProgramError,
     msg,
+    program::{invoke, invoke_signed},
+    program_error::ProgramError,
+    program_pack::{IsInitialized, Pack},
     pubkey::Pubkey,
-    program_pack::{Pack, IsInitialized},
     sysvar::{rent::Rent, Sysvar},
-    program::invoke
 };
 
 use spl_token::state::Account as TokenAccount;
@@ -15,7 +14,6 @@ use spl_token::state::Account as TokenAccount;
 use crate::{error::EscrowError, instruction::EscrowInstruction, state::Escrow};
 
 pub struct Processor;
-
 impl Processor {
   pub fn processor(program_id: &Pubkey, accounts: &[AccountInfo], instruction_data: &[u8]) -> ProgramResult {
     let instruction = EscrowInstruction::unpack(instruction_data)?;
