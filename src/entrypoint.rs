@@ -10,5 +10,5 @@ fn process_instruction(
     accounts: &[AccountInfo],
     instruction_data: &[u8],
 ) -> ProgramResult {
-    Processor::processor(program_id, accounts, instruction_data)
+    Processor::process(program_id, accounts, instruction_data)
 }
